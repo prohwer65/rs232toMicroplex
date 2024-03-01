@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<Project name="mpx">
+<Folder name="Source">
+<File path="mpx.c" />
+</Folder>
+<Folder name="Other">
+<File path="makefile" />
+</Folder>
+</Project>

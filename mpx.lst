@@ -1,0 +1,296 @@
+   1               		.file	"mpx.c"
+   2               		.arch at90s2313
+   3               	__SREG__ = 0x3f
+   4               	__SP_H__ = 0x3e
+   5               	__SP_L__ = 0x3d
+   6               	__tmp_reg__ = 0
+   7               	__zero_reg__ = 1
+   8               		.global __do_copy_data
+   9               		.global __do_clear_bss
+  17               	.Ltext0:
+  18               	.global	main
+  20               	main:
+  21               	.LFB3:
+  22               	.LM1:
+  23               	/* prologue: frame size=0 */
+  24 0000 C0E0      		ldi r28,lo8(__stack - 0)
+  25 0002 D0E0      		ldi r29,hi8(__stack - 0)
+  26 0004 DEBF      		out __SP_H__,r29
+  27 0006 CDBF      		out __SP_L__,r28
+  28               	/* prologue end (size=4) */
+  29               	.LM2:
+  30               	/* #APP */
+  31 0008 F894      		cli
+  32               	.LM3:
+  33               	/* #NOAPP */
+  34 000a 8FEF      		ldi r24,lo8(-1)
+  35 000c 87BB      		out 55-0x20,r24
+  36               	.LM4:
+  37 000e 8EE0      		ldi r24,lo8(14)
+  38 0010 89B9      		out 41-0x20,r24
+  39               	.LM5:
+  40 0012 88E9      		ldi r24,lo8(-104)
+  41 0014 8AB9      		out 42-0x20,r24
+  42               	.LM6:
+  43 0016 1FBC      		out 79-0x20,__zero_reg__
+  44               	.LM7:
+  45 0018 89E0      		ldi r24,lo8(9)
+  46 001a 8EBD      		out 78-0x20,r24
+  47               	.LM8:
+  48 001c 80E0      		ldi r24,lo8(2304)
+  49 001e 99E0      		ldi r25,hi8(2304)
+  50 0020 9BBD      		out (74)+1-0x20,r25
+  51 0022 8ABD      		out 74-0x20,r24
+  52               	.LM9:
+  53 0024 80E4      		ldi r24,lo8(64)
+  54 0026 89BF      		out 89-0x20,r24
+  55               	.LM10:
+  56 0028 80E3      		ldi r24,lo8(48)
+  57 002a 8093 0000 		sts channels,r24
+  58               	.LM11:
+  59 002e 80E6      		ldi r24,lo8(96)
+  60 0030 8093 0000 		sts maxfield,r24
+  61               	.LM12:
+  62               	/* #APP */
+  63 0034 7894      		sei
+  64               	/* #NOAPP */
+  65               	.L2:
+  66               	.LM13:
+  67 0036 FFCF      		rjmp .L2
+  68               	/* epilogue: frame size=0 */
+  69               	/* epilogue: noreturn */
+  70               	/* epilogue end (size=0) */
+  71               	/* function main size 30 (26) */
+  72               	.LFE3:
+  74               	.global	__vector_4
+  76               	__vector_4:
+  77               	.LFB4:
+  78               	.LM14:
+  79               	/* prologue: frame size=0 */
+  80 0038 1F92      		push __zero_reg__
+  81 003a 0F92      		push __tmp_reg__
+  82 003c 0FB6      		in __tmp_reg__,__SREG__
+  83 003e 0F92      		push __tmp_reg__
+  84 0040 1124      		clr __zero_reg__
+  85 0042 8F93      		push r24
+  86 0044 9F93      		push r25
+  87 0046 EF93      		push r30
+  88 0048 FF93      		push r31
+  89               	/* prologue end (size=9) */
+  90               	.LM15:
+  91 004a 9091 0000 		lds r25,field
+  92 004e 8091 0000 		lds r24,maxfield
+  93 0052 8917      		cp r24,r25
+  94 0054 70F4      		brsh .L5
+  95               	.LM16:
+  96 0056 8091 0000 		lds r24,syncntr
+  97 005a 8331      		cpi r24,lo8(19)
+  98 005c 28F4      		brsh .L6
+  99               	.LM17:
+ 100 005e 8F5F      		subi r24,lo8(-(1))
+ 101 0060 8093 0000 		sts syncntr,r24
+ 102               	.LM18:
+ 103 0064 18BA      		out 56-0x20,__zero_reg__
+ 104               	.LM19:
+ 105 0066 15C0      		rjmp .L4
+ 106               	.L6:
+ 107               	.LM20:
+ 108 0068 1092 0000 		sts field,__zero_reg__
+ 109               	.LM21:
+ 110 006c 1092 0000 		sts syncntr,__zero_reg__
+ 111 0070 10C0      		rjmp .L4
+ 112               	.L5:
+ 113               	.LM22:
+ 114 0072 90FD      		sbrc r25,0
+ 115 0074 02C0      		rjmp .L8
+ 116               	.LM23:
+ 117 0076 18BA      		out 56-0x20,__zero_reg__
+ 118 0078 09C0      		rjmp .L9
+ 119               	.L8:
+ 120               	.LM24:
+ 121 007a 892F      		mov r24,r25
+ 122 007c 8695      		lsr r24
+ 123 007e E82F      		mov r30,r24
+ 124 0080 FF27      		clr r31
+ 125 0082 E050      		subi r30,lo8(-(channel))
+ 126 0084 F040      		sbci r31,hi8(-(channel))
+ 127 0086 8081      		ld r24,Z
+ 128 0088 805A      		subi r24,lo8(-(96))
+ 129 008a 88BB      		out 56-0x20,r24
+ 130               	.L9:
+ 131               	.LM25:
+ 132 008c 9F5F      		subi r25,lo8(-(1))
+ 133 008e 9093 0000 		sts field,r25
+ 134               	.L4:
+ 135               	/* epilogue: frame size=0 */
+ 136 0092 FF91      		pop r31
+ 137 0094 EF91      		pop r30
+ 138 0096 9F91      		pop r25
+ 139 0098 8F91      		pop r24
+ 140 009a 0F90      		pop __tmp_reg__
+ 141 009c 0FBE      		out __SREG__,__tmp_reg__
+ 142 009e 0F90      		pop __tmp_reg__
+ 143 00a0 1F90      		pop __zero_reg__
+ 144 00a2 1895      		reti
+ 145               	/* epilogue end (size=9) */
+ 146               	/* function __vector_4 size 54 (36) */
+ 147               	.LFE4:
+ 149               	.global	__vector_7
+ 151               	__vector_7:
+ 152               	.LFB5:
+ 153               	.LM26:
+ 154               	/* prologue: frame size=0 */
+ 155 00a4 1F92      		push __zero_reg__
+ 156 00a6 0F92      		push __tmp_reg__
+ 157 00a8 0FB6      		in __tmp_reg__,__SREG__
+ 158 00aa 0F92      		push __tmp_reg__
+ 159 00ac 1124      		clr __zero_reg__
+ 160 00ae 2F93      		push r18
+ 161 00b0 3F93      		push r19
+ 162 00b2 4F93      		push r20
+ 163 00b4 8F93      		push r24
+ 164 00b6 9F93      		push r25
+ 165 00b8 EF93      		push r30
+ 166 00ba FF93      		push r31
+ 167               	/* prologue end (size=12) */
+ 168               	.LM27:
+ 169 00bc 8CB1      		in r24,44-0x20
+ 170 00be 8093 0000 		sts data,r24
+ 171               	.LM28:
+ 172 00c2 873A      		cpi r24,lo8(-89)
+ 173 00c4 60F0      		brlo .L11
+ 174               	.LM29:
+ 175 00c6 8A3A      		cpi r24,lo8(-86)
+ 176 00c8 21F4      		brne .L12
+ 177               	.LM30:
+ 178 00ca 81E0      		ldi r24,lo8(1)
+ 179 00cc 8093 0000 		sts addrflag,r24
+ 180               	.LM31:
+ 181 00d0 44C0      		rjmp .L10
+ 182               	.L12:
+ 183               	.LM32:
+ 184 00d2 873A      		cpi r24,lo8(-89)
+ 185 00d4 21F4      		brne .L11
+ 186               	.LM33:
+ 187 00d6 81E0      		ldi r24,lo8(1)
+ 188 00d8 8093 0000 		sts chlength,r24
+ 189               	.LM34:
+ 190 00dc 3EC0      		rjmp .L10
+ 191               	.L11:
+ 192               	.LM35:
+ 193 00de 8091 0000 		lds r24,addrflag
+ 194 00e2 8130      		cpi r24,lo8(1)
+ 195 00e4 59F4      		brne .L14
+ 196               	.LM36:
+ 197 00e6 1092 0000 		sts addrflag,__zero_reg__
+ 198               	.LM37:
+ 199 00ea 9091 0000 		lds r25,data
+ 200 00ee 8091 0000 		lds r24,channels
+ 201 00f2 9817      		cp r25,r24
+ 202 00f4 90F5      		brsh .L10
+ 203               	.LM38:
+ 204 00f6 9093 0000 		sts address,r25
+ 205               	.LM39:
+ 206 00fa 2FC0      		rjmp .L10
+ 207               	.L14:
+ 208               	.LM40:
+ 209 00fc 8091 0000 		lds r24,chlength
+ 210 0100 9091 0000 		lds r25,data
+ 211 0104 8130      		cpi r24,lo8(1)
+ 212 0106 79F4      		brne .L16
+ 213               	.LM41:
+ 214 0108 1092 0000 		sts chlength,__zero_reg__
+ 215               	.LM42:
+ 216 010c 892F      		mov r24,r25
+ 217 010e 8650      		subi r24,lo8(-(-6))
+ 218 0110 8B35      		cpi r24,lo8(91)
+ 219 0112 18F5      		brsh .L10
+ 220               	.LM43:
+ 221 0114 9093 0000 		sts channels,r25
+ 222               	.LM44:
+ 223 0118 892F      		mov r24,r25
+ 224 011a 9927      		clr r25
+ 225 011c 880F      		add r24,r24
+ 226 011e 991F      		adc r25,r25
+ 227 0120 8093 0000 		sts maxfield,r24
+ 228               	.LM45:
+ 229 0124 1AC0      		rjmp .L10
+ 230               	.L16:
+ 231               	.LM46:
+ 232 0126 903A      		cpi r25,lo8(-96)
+ 233 0128 18F0      		brlo .L18
+ 234               	.LM47:
+ 235 012a 8FE9      		ldi r24,lo8(-97)
+ 236 012c 8093 0000 		sts data,r24
+ 237               	.L18:
+ 238               	.LM48:
+ 239 0130 4091 0000 		lds r20,address
+ 240 0134 242F      		mov r18,r20
+ 241 0136 3327      		clr r19
+ 242 0138 F32F      		mov r31,r19
+ 243 013a E22F      		mov r30,r18
+ 244 013c E050      		subi r30,lo8(-(channel))
+ 245 013e F040      		sbci r31,hi8(-(channel))
+ 246 0140 8091 0000 		lds r24,data
+ 247 0144 8083      		st Z,r24
+ 248               	.LM49:
+ 249 0146 8091 0000 		lds r24,channels
+ 250 014a 9927      		clr r25
+ 251 014c 0197      		sbiw r24,1
+ 252 014e 2817      		cp r18,r24
+ 253 0150 3907      		cpc r19,r25
+ 254 0152 1CF4      		brge .L10
+ 255               	.LM50:
+ 256 0154 4F5F      		subi r20,lo8(-(1))
+ 257 0156 4093 0000 		sts address,r20
+ 258               	.L10:
+ 259               	/* epilogue: frame size=0 */
+ 260 015a FF91      		pop r31
+ 261 015c EF91      		pop r30
+ 262 015e 9F91      		pop r25
+ 263 0160 8F91      		pop r24
+ 264 0162 4F91      		pop r20
+ 265 0164 3F91      		pop r19
+ 266 0166 2F91      		pop r18
+ 267 0168 0F90      		pop __tmp_reg__
+ 268 016a 0FBE      		out __SREG__,__tmp_reg__
+ 269 016c 0F90      		pop __tmp_reg__
+ 270 016e 1F90      		pop __zero_reg__
+ 271 0170 1895      		reti
+ 272               	/* epilogue end (size=12) */
+ 273               	/* function __vector_7 size 103 (79) */
+ 274               	.LFE5:
+ 276               		.comm channels,1,1
+ 277               		.comm maxfield,1,1
+ 278               		.comm field,1,1
+ 279               		.comm syncntr,1,1
+ 280               		.comm channel,97,1
+ 281               		.comm data,1,1
+ 282               		.comm addrflag,1,1
+ 283               		.comm address,1,1
+ 284               		.comm chlength,1,1
+ 285               	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:00000000 mpx.c
+                            *ABS*:0000003f __SREG__
+                            *ABS*:0000003e __SP_H__
+                            *ABS*:0000003d __SP_L__
+                            *ABS*:00000000 __tmp_reg__
+                            *ABS*:00000001 __zero_reg__
+C:\DOCUME~1\JONATH~1\LOCALS~1\Temp/ccUlaaaa.s:20     .text:00000000 main
+                            *COM*:00000001 channels
+                            *COM*:00000001 maxfield
+C:\DOCUME~1\JONATH~1\LOCALS~1\Temp/ccUlaaaa.s:76     .text:00000038 __vector_4
+                            *COM*:00000001 field
+                            *COM*:00000001 syncntr
+                            *COM*:00000061 channel
+C:\DOCUME~1\JONATH~1\LOCALS~1\Temp/ccUlaaaa.s:151    .text:000000a4 __vector_7
+                            *COM*:00000001 data
+                            *COM*:00000001 addrflag
+                            *COM*:00000001 chlength
+                            *COM*:00000001 address
+
+UNDEFINED SYMBOLS
+__do_copy_data
+__do_clear_bss
+__stack
