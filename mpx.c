@@ -44,7 +44,7 @@
 #define SYNCLEVEL   0x00                        //Sync pulse DAC value
 #define OFFLEVEL    0x60                        //Light OFF DAC value
 #define MAXLEVEL    255-OFFLEVEL                //Max light level from PC
-#define MAXCHANNELS       96                          //Max # of channels
+#define MAXCHANNELS       48                          //Max # of channels
 
 
 unsigned char channels;                     //Number of Microplex channels
@@ -91,7 +91,7 @@ int main (void)
   TCCR0A = 0x02;                               //Clear Timer0 on Compare (CTC) WGM0-2:0 = 0b010
   TCCR0B = 0x04;                               // Clock Select CS0-2:0 = 0b100 or clk/256
   OCR0A = 9;                                   // 9 * 256 * clkperiod  = 250u Frame
-  TIMSK = 0x01;                                //Enable Timer/Counter0 Output Compare Match A (need to set the I-bit in Status Register)
+  TIMSK = 0x01;                                //Enable Timer/Counter0 Output Compare Match A (do I need to set the I-bit in Status Register?)
 
 
   // Setup timer1 to control fades
@@ -107,17 +107,17 @@ int main (void)
   // TIMSK |=  0x40;  // enable timer1
   // TIMSK &=  0xbf;  // disable timer1
 
-  SREG = SREG | 0x80;   // enable Global Interrupts I bit.
+  //SREG = SREG | 0x80;   // enable Global Interrupts I bit???.
 
   GTCCR = 0x01;         // Reset the clock precalers for both T0 and T1
-  channels = 48;                                 //Default number of channels
-  maxfield = 96;
+  channels = MAXCHANNELS;                                 //Default number of channels
+  maxfield = MAXCHANNELS*2;
   sei();
   for (;;);
 }
 
 
-ISR(TIMER0_COMPA_vec )   //tSIG_OUTPUT_COMPARE0A)    //occurs every 250us
+ISR(TIMER0_COMPA_vect )   //tSIG_OUTPUT_COMPARE0A)    //occurs every 250us
 {
   if (field > maxfield) {                        //Test for end of channels
     if (syncntr <= 18) {                        //Build channel 0 5ms sync pulse
@@ -129,7 +129,7 @@ ISR(TIMER0_COMPA_vec )   //tSIG_OUTPUT_COMPARE0A)    //occurs every 250us
     syncntr = 0;                                //Reset 5ms sync pulse counter
   }
   else {
-    if (!(field & 0x01)) 
+    if (!(field & 0x01))                // Odd or Even; Sync pulse or level pulse?
       PORTB = SYNCLEVEL;                      //DAC is SYNCLEVEL if field = even 
     else 
       PORTB = channelLevel [(field >> 1)] + OFFLEVEL; //DAC is channel data if field = odd
@@ -140,10 +140,11 @@ ISR(TIMER0_COMPA_vec )   //tSIG_OUTPUT_COMPARE0A)    //occurs every 250us
 
 ISR( USART_RX_vect )    //  SIG_UART_RECV)
 {
-    int i;
+  int i;
   data = UDR;
   if (data >= 0xA7) {
-    fadeflag=0;                    //Disable fade mode 
+    // Command parsing
+    //
     if (data == 0xAA) {                   //Address Command
                                           // format:  0xAA, starting address, value(s) 
       addrflag = 1;                       //Set Flag for next RX Byte = address
@@ -151,7 +152,7 @@ ISR( USART_RX_vect )    //  SIG_UART_RECV)
     }
     if (data == 0xA7) {                   //Channel Length Program Command
                                           // format:  0xA7, # of channels
-      channelflag = 1;                       //Set Flag for next RX Byte = # of channels
+      channelflag = 1;                    //Set Flag for next RX Byte = # of channels
       return;
     }
     if ( data == 0xBB ) {                 // turn off all channels
@@ -162,24 +163,23 @@ ISR( USART_RX_vect )    //  SIG_UART_RECV)
       return;
     }
     if ( data == 0xFB ) {                 // Fade to Black, all channels go to level 0
-                                          // format:  0xFB, transRate in secs,
-      fadetoblackflag  = 1;             // Set flag for next RX byte to transRate in secs
-     // enable 1 second timer starting now.  Assumes all Target levels will be sent in under 1secs
+                                          // format:  0xFB, transRate in 500 msecs,
+      fadetoblackflag  = 1;               // Set flag for next RX byte to transRate in 500 msecs
       return;
     }
     if ( data == 0xFA ) {                 // setup for slow fade to new levels
-                                          // format:  0xFA, transRate in secs, starting address, value(s) 
+                                          // format:  0xFA, transRate in 500 msecs, starting address, value(s) 
       // initialize targetlvl to existing values
-      // set
       for (i=0; i<channels; i++) {
         channelTarget[i] = channelLevel[i] ;
       }
       fadeflag=1;              // Set flag for next RX byte to be fadeRate
-      // enable 1 second timer starting now.  Assumes all Target levels will be sent in under 1secs
+      
       return;
     }
-  }
+  }     // end of command parsing
 
+  // data should contain either a starting address, level, fade time.
   if (addrflag == 1) {
     addrflag = 0;
     if (data < channels)  {
@@ -189,6 +189,7 @@ ISR( USART_RX_vect )    //  SIG_UART_RECV)
   }
 
   if ( fadetoblackflag ==1) {
+    fadetoblackflag  = 0;               // Set flag for next RX byte to transRate in 500 msecs
 
     fadeRate = data+1;
     for (i=0; i<channels; i++) {
@@ -200,8 +201,10 @@ ISR( USART_RX_vect )    //  SIG_UART_RECV)
   }
 
   if ( fadeflag ==1) {
+    fadeflag=0;                    //Disable fade mode 
     fadeRate = data+1;
     addrflag = 1;                         // Set Flag for next RX Byte = address 
+    TIMSK |= 0x40;  // enable timer1
     return;
   }
 
@@ -221,13 +224,8 @@ ISR( USART_RX_vect )    //  SIG_UART_RECV)
 
   if ( fadeRate >0) {
     channelTarget[address] = data;                 //Load Target channel value into array
-    // put initial new values in channelLevel
-    //
-
-    channelLevel[i] = calculateFadeRate( channelLevel[i] ,  data,  fadeRate);
-    TIMSK |= 0x40;  // enable timer1
-
-
+    channelLevel[address] = calculateFadeRate( channelLevel[address] ,  data,  fadeRate);
+    //TIMSK |= 0x40;  // enable timer1
 
   } else {
     channelLevel[address] = data;                 //Load channel value into array
@@ -276,8 +274,13 @@ ISR(TIMER1_COMPA_vect )   // SIG_OUTPUT_COMPARE1A )   //occurs every 500ms when 
 unsigned char calculateFadeRate( unsigned char currLevel, unsigned char targetlvl, unsigned char fadeRate)
 {
 
-  unsigned char newlevel;
+  unsigned char newlevel=currLevel;
 
+  if ( fadeRate <2) {
+    fadeRate  = 0;
+    return newlevel;
+
+  }
   // need this complicated routine because working with unsigned values......
   if ( currLevel > targetlvl) {
     newlevel = currLevel + (( currLevel - targetlvl)/ fadeRate);

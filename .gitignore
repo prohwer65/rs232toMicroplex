@@ -7,3 +7,6 @@ doc4298.pdf
 nbproject 
 *.bak 
 *.pdf 
+build/ 
+dist/ 
+oldfiles/
