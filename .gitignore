@@ -3,3 +3,7 @@
 *.elf  
 *.o  
 doc4298.pdf 
+.generated_files 
+nbproject 
+*.bak 
+*.pdf 
