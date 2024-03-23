@@ -47,7 +47,30 @@ use POSIX ":sys_wait_h";
 use English '-no_match_vars';
     # see perlvar for variable names and features
     # no_match to reduce regx effiecency loss
-use Win32::SerialPort qw( :STAT 0.19 );
+our $OS_win;
+
+
+BEGIN {
+        $OS_win = ($^O eq "MSWin32") ? 1 : 0;
+
+        print "Perl version: $]\n";
+        print "OS   version: $^O\n";
+
+            # This must be in a BEGIN in order for the 'use' to be conditional
+        if ($OS_win) {
+            print "Loading Windows module\n";
+            eval "use Win32::SerialPort";
+	    die "$@\n" if ($@);
+
+        }
+        else {
+            print "Loading Unix module\n";
+            eval "use Device::SerialPort";
+	    die "$@\n" if ($@);
+        }
+} # End BEGIN
+
+#use Win32::SerialPort qw( :STAT 0.19 );
 
 #use File::stat;
 #use File::Copy;
@@ -105,7 +128,7 @@ sub VERSION_MESSAGE();
 
 my $OS;
 my %cmdLineOption;
-getopts( "hd:f:", \%cmdLineOption );
+getopts( "hp:f:", \%cmdLineOption );
     #	<+INPUTOPTIONS+>
 
  # examples of direct associating
@@ -135,10 +158,11 @@ if ( defined $cmdLineOption{h} ) {
     exit(15);
 }
 
-#if ( defined $cmdLineOption{d} )  {
-# something =   $cmdLineOption{d} ;
-#	<+INPUTOPTIONS+>
-#}
+my $PortName = "COM1";
+if ( defined $cmdLineOption{p} )  {
+ $PortName =   $cmdLineOption{p} ;
+ #<+INPUTOPTIONS+>
+}
 
 #if ( defined $cmdLineOption{f} )  {
 # something =   $cmdLineOption{f} ;
@@ -153,19 +177,32 @@ if ( defined $cmdLineOption{h} ) {
 my $time = localtime();
 print "$time\n";
 
-my $PortName = "COM1";
 my $quiet = 0;
-my $PortObj = new Win32::SerialPort ($PortName, $quiet)
-     || die "Can't open $PortName: $^E\n";    # $quiet is optional
-  # most methods can be called three ways:
-$PortObj->handshake("xoff");           # set parameter
+
+my $PortObj;
+if ($OS_win) {
+    $PortObj = new Win32::SerialPort ($PortName, $quiet) || die "Can't open $PortName: $^E\n";    # $quiet is optional
+} else {
+    $PortObj = Device::SerialPort->new ($PortName,1);
+}
+
 
    # similar
-$PortObj->baudrate(38400);
+$PortObj->baudrate(9600);
 $PortObj->parity("none");
 $PortObj->databits(8);
 $PortObj->stopbits(1);
- 
+$PortObj->handshake("none");           # set parameter
+$PortObj->binary(1);          
+$PortObj->debug(1);
+
+  $PortObj->error_msg(1);  # prints hardware messages like "Framing Error"
+  $PortObj->user_msg(1);   # prints function messages like "Waiting for CTS"
+
+  $PortObj->status();
+
+my @handshake_opts = $PortObj->handshake; 
+print "Handshakes " . join( ", ", @handshake_opts ) . "\n";
    # range parameters return (minimum, maximum) in list context
    #$PortObj->xon_limit(100);      # bytes left in buffer
    #$PortObj->xoff_limit(100);     # space left in buffer
@@ -175,7 +212,7 @@ $PortObj->stopbits(1);
    #$PortObj->event_char(0x0);
    #$PortObj->error_char(0);       # for parity errors
  
-$PortObj->buffers(4096, 4096);  # read, write
+   #$PortObj->buffers(4096, 4096);  # read, write
       # returns current in list context
  
       #$PortObj->read_interval(100);    # max time between read char (milliseconds)
@@ -188,7 +225,6 @@ $PortObj->buffers(4096, 4096);  # read, write
  
 $PortObj->binary(1);          # just say Yes (Win 3.x option)
 #$PortObj->parity_enable(F);   # faults during input
-$PortObj->debug(0);
 
 
 
@@ -197,6 +233,7 @@ my $level    = 159;
 my $numOfChannels = 24;
 
 while (1) {
+    $PortObj->status();
     print "1.  Blackout Test\n";
     print "2.  Fade To Black Test\n";
     print "3.  Bump sequencial channels to ". $level . " Test\n";
@@ -369,11 +406,11 @@ sub bumpTest {
         $PortObj->write( 0xBB);     # send Black out command;
 
 
-        print "Changing Channel ". $i+1 . " to new level: ". $newLevel . "\n";
+        print "Changing Channel " . ($i+1) . " to new level: ". $newLevel . "\n";
         $PortObj->write( 0xAA);         # send Fade command;
         $PortObj->write( atoi($i));           # starting at address 00h
         $PortObj->write( atoi($newLevel));
-        sleep( 5);
+        sleep( 2);
     }
 
 }

@@ -19,6 +19,24 @@
 //  Fade to black gradually 1 to 3 secs.
 
 
+//  Wiring of SNAP to ATTiny2313
+//  SNAP J4     name        ATTiny pins
+//      1                   not connected
+//      2       Vcc         20
+//      3       GND         10
+//      4       MISO        18
+//      5       SCK         19
+//      6       RST          1
+//      7       MOSI        17
+//      8                   not connected
+//
+//
+// Snap to ATTiny SPI programming issue:
+// - Double checked wiring between Snap and ATTiny2313
+// - Snap has an undocumented jumper (PIC or AVR) which is in the AVR position
+// - Snap only produces 1.9V on the Vdd pin (unloaded). 
+// - Able to program the ATTiny2313 with an Arduino Uno board
+// - Status LED on the Snap never flashes, should it?
 
 
 // Processor frequency.
@@ -45,7 +63,9 @@
 #define OFFLEVEL 0x60            //Light OFF DAC value
 #define MAXLEVEL 255 - OFFLEVEL  //Max light level from PC
 #define MAXCHANNELS 48           //Max # of Microplex channels  (ATtiny2313 can handle 48, ATtiny4313 can handle 96)
-
+#define HEARTBEATLED      PINA1    // physical pin 4
+#define RAMPINPROGRESSLED PINA0    // physical pin 5
+#define EXTRALED          PINA2    // physical pin 1
 
 unsigned char channels=MAXCHANNELS;                        //Number of Microplex channels
 unsigned char maxfield=MAXCHANNELS*2;                        //Always 2x channels
@@ -61,19 +81,26 @@ unsigned char addrflag=0;         //Flags next RX Byte = address
 unsigned char channelflag=0;      //Flags next RX Byte = # of channels
 unsigned char fadeflag=0;         //Flags next RX Byte as fadeRate
 unsigned char fadetoblackflag=0;  //Flags next RX Byte as fadeRate for fade to black
-unsigned char toggle=0;   // pwr debug
-#define  buttonPin  6    // pwr debug  physical pin 8
-#define  rampPin       7  // pwr debug   physical pin 9  indicates when a Ramp or Fade is in progess
-#define  pulsePin     8  // pwr debug physical pin 11, 
+int toggle=0;   // pwr debug
+//#define  buttonPin  6    // pwr debug  physical pin 8
+//#define  rampPin       7  // pwr debug   physical pin 9  indicates when a Ramp or Fade is in progress
+//#define  pulsePin     8  // pwr debug physical pin 11, 
 
-//signed int delta;                           // sign byte between current level and target level
+
 unsigned char calculateFadeRate(unsigned char currlevel, unsigned char targetlevel, unsigned char fadeRate);
+void LED( unsigned char LED, unsigned char status);
+
 
 int main (void)
 {
   cli();
   //Setup Ports
   DDRB = 0xFF;  //Set Port B as Output
+  DDRA = 0x03;   //Set port A pins 0:1 as Output
+    //PINA = (0 <<PINA0);      // 
+    LED( RAMPINPROGRESSLED, 0);          // Ramp in progress LED
+    LED( HEARTBEATLED, ( toggle++&0x1)); // heartbeat LED
+  
   //Setup UART
   UBRRL = (char)UART_BAUD_SELECT;  // updated to ATtiny2312 naming convention
   UCSRB = 0x98;                    //enable Rx, Rx IQR & Tx        // updated to ATtiny2312 naming convention
@@ -116,10 +143,11 @@ int main (void)
   GTCCR = 0x01;            // Reset the clock precalers for both T0 and T1
   channels = 24;     //MAXCHANNELS;  //Default number of channels
   maxfield = channels * 2;  // always 2x channels
+  
   //pinMode(buttonPin, INPUT_PULLUP);   // pwr debug
   //pinMode(rampPin, OUTPUT);   //pwr debug
   //digitalWrite(rampPin, LOW);
-  // pinMode(pulsePin, OUTPUT);   //pwr debug
+  //inMode(pulsePin, OUTPUT);   //pwr debug
 
   unsigned char i;
   for (i = 0; i < channels; i++) {
@@ -128,7 +156,9 @@ int main (void)
   }
 
   sei();
-  for (;;)
+  for (;;) {
+      //LED( HEARTBEATLED, ( toggle++&0x8000));
+  }
     ;
 }
 
@@ -136,30 +166,37 @@ int main (void)
 
 ISR(TIMER0_COMPA_vect)  //tSIG_OUTPUT_COMPARE0A)    //occurs every 250us
 {
+    LED( HEARTBEATLED, ( toggle++&0x0800));
   // digitalWrite( pulsePin, (toggle++&0x1) );       // pwr debug
-  if (field > maxfield) {  //Test for end of channels
-    if (syncntr <= 18) {   //Build 5ms sync pulse  ( 19*250us)
-      syncntr++;
-      PORTB = SYNCLEVEL;
-      return;
+    if (field > maxfield) {  //Test for end of channels
+      if ( syncntr < 3 ) {  // send postamble 4x 250us  (OPTIONAL)
+          PORTB = OFFLEVEL;
+          syncntr++;
+          
+          // could update the ramp levels if needed here every 500ms/ (maxfield * 500us) + 5ms
+          return;
+      }
+      PORTB = SYNCLEVEL;    // send Sync pulse or preamble 
+      if (syncntr <= 18) {   //Build 5ms sync pulse  ( 19*250us)
+        syncntr++;
+        return;
+      }
+     
+      field = 0;    //Reset 1/2 channel counter
+      syncntr = 0;  //Reset 5ms sync pulse counter
+    } else {
+      if (!(field & 0x01))  // Odd or Even; Sync pulse or level pulse?
+        PORTB = SYNCLEVEL;  //DAC is SYNCLEVEL if field = even
+      else
+        PORTB = channelLevel[(field >> 1)] + OFFLEVEL;  //DAC is channel data if field = odd
+      field++;
     }
-    PORTB = SYNCLEVEL;
-    
-    field = 0;    //Reset 1/2 channel counter
-    syncntr = 0;  //Reset 5ms sync pulse counter
-  } else {
-    if (!(field & 0x01))  // Odd or Even; Sync pulse or level pulse?
-      PORTB = SYNCLEVEL;  //DAC is SYNCLEVEL if field = even
-    else
-      PORTB = channelLevel[(field >> 1)] + OFFLEVEL;  //DAC is channel data if field = odd
-    field++;
-  }
 }
 
 
 ISR( USART_RX_vect )  //  SIG_UART_RECV)
 {
-  int i;
+  unsigned char i;
   data = UDR;
   if (data >= 0xA7) {
     // Command parsing
@@ -208,7 +245,7 @@ ISR( USART_RX_vect )  //  SIG_UART_RECV)
   }
 
   if (fadetoblackflag == 1) {
-    fadetoblackflag = 0;  // Set flag for next RX byte to transRate in 500 msecs
+    fadetoblackflag = 0;  // Reset flag for next RX byte to transRate in 500 msecs
 
     fadeRate = data + 1;
     for (i = 0; i < channels; i++) {
@@ -216,6 +253,8 @@ ISR( USART_RX_vect )  //  SIG_UART_RECV)
       channelLevel[i] = calculateFadeRate(channelLevel[i], 0, fadeRate);
     }
     TIMSK |= 0x40;  // enable timer1
+    LED (RAMPINPROGRESSLED, 1);      // Ramp in progress LED
+    
     //digitalWrite(rampPin, HIGH);
     return;
   }
@@ -225,6 +264,8 @@ ISR( USART_RX_vect )  //  SIG_UART_RECV)
     fadeRate = data + 1;
     addrflag = 1;   // Set Flag for next RX Byte = address
     TIMSK |= 0x40;  // enable timer1
+    LED (RAMPINPROGRESSLED, 1);      // Ramp in progress LED
+    
     // digitalWrite(rampPin, HIGH);
     return;
   }
@@ -260,7 +301,9 @@ ISR( USART_RX_vect )  //  SIG_UART_RECV)
 //Interrupt Service Routine
 ISR(TIMER1_COMPA_vect)  // SIG_OUTPUT_COMPARE1A )   //occurs every 500ms when timer1 is enabled
 {
-  int i;
+  unsigned char i;
+  
+   
   if (fadeRate < 2) {
     fadeRate = 0;
     for (i = 0; i < channels; i++) {
@@ -268,6 +311,8 @@ ISR(TIMER1_COMPA_vect)  // SIG_OUTPUT_COMPARE1A )   //occurs every 500ms when ti
     }
 
     TIMSK &= 0xbf;  // disable timer1
+    LED (RAMPINPROGRESSLED, 0);      // Ramp in progress LED
+    
     //digitalWrite(rampPin, LOW);    // turn the LED off when not ramping or fading
     // stop the timer1
     return;
@@ -280,10 +325,13 @@ ISR(TIMER1_COMPA_vect)  // SIG_OUTPUT_COMPARE1A )   //occurs every 500ms when ti
     channelLevel[i] = calculateFadeRate(currLevel, targetlvl, fadeRate);
   }
 
-  fadeRate--;
+  if ( fadeRate != 0) {
+    fadeRate--;
+  }
   return;
 
 }
+
 
 
 // ----------------------------------------------------------------------------------------
@@ -291,23 +339,27 @@ ISR(TIMER1_COMPA_vect)  // SIG_OUTPUT_COMPARE1A )   //occurs every 500ms when ti
 // ----------------------------------------------------------------------------------------
 // Functions
 //
-unsigned char calculateFadeRate(unsigned char currLevel, unsigned char targetlvl, unsigned char fadeRate) {
+unsigned char calculateFadeRate(unsigned char currLevel, unsigned char targetlvl, unsigned char lfadeRate) {
 
   unsigned char newlevel = currLevel;
 
-  if (fadeRate < 2) {
-    fadeRate = 0;
+  if (lfadeRate < 2) {
+    //fadeRate = 0;
     return newlevel;
 
   }
   // need this complicated routine because working with unsigned values......
   if (currLevel > targetlvl) {
-    newlevel = currLevel + ((currLevel - targetlvl) / fadeRate);
+    newlevel = currLevel + ((currLevel - targetlvl) / lfadeRate);
   }
 
   // need this complicated routine because working with unsigned values......
   if (currLevel < targetlvl) {
-    newlevel = currLevel - ((targetlvl - currLevel) / fadeRate);
+    newlevel = currLevel - ((targetlvl - currLevel) / lfadeRate);
+  }
+  
+  if (newlevel > MAXLEVEL){ 
+      newlevel = MAXLEVEL;
   }
 
   return newlevel;
@@ -315,4 +367,10 @@ unsigned char calculateFadeRate(unsigned char currLevel, unsigned char targetlvl
 
 }
 
+void LED( unsigned char LED, unsigned char status) {
+    if ( status !=0) 
+        status = 1;     // make status a binary value;
+    
+    PINA = ( status << LED);
+}
 //:vim smarttab tabstop=4  expandtab autoindent shiftwidth=4
